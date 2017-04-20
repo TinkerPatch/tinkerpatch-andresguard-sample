@@ -1,0 +1,157 @@
+apply plugin: 'AndResGuard'
+
+def bakPath = project.ext.TP_BAKPATH
+def baseInfo = project.ext.TP_BASEINFO
+def variantName = project.ext.TP_VARIANTNAME
+
+
+project.afterEvaluate {
+    def date = new Date().format("MMdd-HH-mm-ss")
+    def andResGuardApkSuffix = "andresguard.apk"
+
+    def apkSuffix = "_signed_7zip_aligned.apk"
+
+    /**
+     * bak apk and mapping
+     */
+    android.applicationVariants.all { variant ->
+        /**
+         * task type, you want to bak
+         */
+        def taskName = variant.name
+        String name = variant.name.toLowerCase()
+        String destFilePrefix = "${project.name}-${name}"
+
+        // find resguard task first
+        def resguardTask = project.tasks.findByName("resguard${taskName.capitalize()}")
+        if (resguardTask == null) {
+            println("resguardTask not found, just return")
+            return
+        }
+
+        def tinkerPatchTask = project.tasks.findByName("tinkerPatch${taskName.capitalize()}")
+        if (tinkerPatchTask == null) {
+            println("resguardTask not found, just return")
+            return
+        }
+
+        resguardTask.doFirst {
+            def resMapping = "${bakPath}/${baseInfo}/${taskName}/${project.name}-${taskName}-resource_mapping.txt"
+            File mapping = new File(resMapping)
+            if (mapping.exists()) {
+                println("change resguardTask mapping file to ${resMapping}")
+                project.extensions.andResGuard.mappingFile = file(resMapping)
+            }
+        }
+        tinkerPatchTask.doFirst {
+
+            def buildApkPath = "${buildDir}/outputs/apk/AndResGuard_${project.getName()}-${taskName}/${project.getName()}-${taskName}${apkSuffix}"
+            if (!file(buildApkPath).exists()) {
+                /** AndResGuard use the different suffix when apk using v2SignatureSchema **/
+                apkSuffix = "_aligned_signed.apk"
+                buildApkPath = "${buildDir}/outputs/apk/AndResGuard_${project.getName()}-${taskName}/${project.getName()}-${taskName}${apkSuffix}"
+            }
+
+            println("change tinkerPatchTask buildApkPath to resugurad output ${buildApkPath}")
+            tinkerPatchTask.buildApkPath = buildApkPath
+
+            println("change tinkerPatchTask baseApk to ${destFilePrefix}-${andResGuardApkSuffix}")
+            project.extensions.tinkerPatch.oldApk = "${bakPath}/${baseInfo}/${variantName}/${destFilePrefix}-${andResGuardApkSuffix}"
+
+        }
+        tinkerPatchTask.dependsOn resguardTask
+
+        resguardTask.doLast {
+            String buildType = variant.buildType.name.toLowerCase()
+
+            if (!name.equalsIgnoreCase(buildType) && name.endsWith(buildType)) {
+                name = name - buildType + "-${buildType}"
+            }
+
+            String mAppVersion = project.extensions.tinkerpatchSupport.appVersion
+
+            String destPath = "${bakPath}/${project.name}-${mAppVersion}-${date}/${name}/"
+
+            copy {
+                def apkPath = "${buildDir}/outputs/apk/AndResGuard_${project.getName()}-${taskName}/${project.getName()}-${taskName}${apkSuffix}"
+                if (!file(apkPath).exists()) {
+                    /** AndResGuard use the different suffix when apk using v2SignatureSchema **/
+                    apkSuffix = "_aligned_signed.apk"
+                    apkPath = "${buildDir}/outputs/apk/AndResGuard_${project.getName()}-${taskName}/${project.getName()}-${taskName}${apkSuffix}"
+                }
+                from apkPath
+                into file("${destPath}/")
+                rename { String fileName ->
+                    fileName.replace("${project.getName()}-${taskName}${apkSuffix}", "${destFilePrefix}-${andResGuardApkSuffix}")
+                }
+
+                from "${buildDir}/outputs/apk/AndResGuard_${project.getName()}-${taskName}/resource_mapping_${project.getName()}-${taskName}.txt"
+                into file("${destPath}/")
+                rename { String fileName ->
+                    fileName.replace("resource_mapping_${project.getName()}-${taskName}.txt", "${destFilePrefix}-resource_mapping.txt")
+                }
+            }
+        }
+    }
+
+}
+
+
+andResGuard {
+    mappingFile = null
+    use7zip = true
+    useSign = true
+    keepRoot = false
+    // add <yourpackagename>.R.drawable.icon into whitelist.
+    // because the launcher will get the icon with his name
+    whiteList = [
+            // your icon
+            "R.drawable.icon",
+            // for fabric
+            "R.string.com.crashlytics.*",
+            // for umeng update
+            "R.string.umeng*",
+            "R.string.UM*",
+            "R.string.tb_*",
+            "R.string.rc_*",
+            "R.layout.umeng*",
+            "R.layout.tb_*",
+            "R.layout.rc_*",
+            "R.drawable.umeng*",
+            "R.drawable.tb_*",
+            "R.drawable.rc_*",
+            "R.drawable.u1*",
+            "R.drawable.u2*",
+            "R.anim.umeng*",
+            "R.color.umeng*",
+            "R.color.tb_*",
+            "R.color.rc_*",
+            "R.style.*UM*",
+            "R.style.umeng*",
+            "R.style.rc_*",
+            "R.id.umeng*",
+            "R.id.rc_*",
+            // umeng share for sina
+            "R.drawable.sina*",
+            // for google-services.json
+            "R.string.google_app_id",
+            "R.string.gcm_defaultSenderId",
+            "R.string.default_web_client_id",
+            "R.string.ga_trackingId",
+            "R.string.firebase_database_url",
+            "R.string.google_api_key",
+            "R.string.google_crash_reporting_api_key",
+            "R.dimen.rc_*"
+    ]
+    compressFilePattern = [
+            "*.png",
+            "*.jpg",
+            "*.jpeg",
+            "*.gif",
+            "resources.arsc"
+    ]
+    sevenzip {
+        artifact = "com.tencent.mm:SevenZip:${ANDRESGUARD_VERSION}"
+        //path = "/usr/local/bin/7za"
+    }
+}

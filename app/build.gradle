@@ -1,0 +1,57 @@
+apply plugin: 'com.android.application'
+
+dependencies {
+    compile fileTree(dir: 'libs', include: ['*.jar'])
+    compile "com.android.support:appcompat-v7:23.1.1"
+    compile "com.android.support:multidex:1.0.1"
+
+    //无需引入tinker的任何库,使用tinkerpatch sdk即可
+    compile("com.tinkerpatch.sdk:tinkerpatch-android-sdk:${TINKERPATCH_VERSION}") { changing = true }
+}
+
+android {
+    compileSdkVersion 23
+    buildToolsVersion '25.0.2'
+
+    signingConfigs {
+        debug {
+            storeFile rootProject.file("keystore/debug.keystore")
+            //v2SigningEnabled false
+        }
+    }
+
+    defaultConfig {
+        applicationId "com.tinkerpatch.easy_sample"
+        minSdkVersion 15
+        targetSdkVersion 22
+        versionCode 1
+        versionName "1.0"
+        multiDexEnabled true
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android.txt')
+            signingConfig signingConfigs.debug
+        }
+        debug {
+            debuggable true
+            minifyEnabled false
+            signingConfig signingConfigs.debug
+        }
+    }
+
+//    productFlavors {
+//        flavor1 {
+//            applicationId 'com.tinkerpatch.easy_sample.flavor1'
+//        }
+//
+//        flavor2 {
+//            applicationId 'com.tinkerpatch.easy_sample.flavor2'
+//        }
+//    }
+}
+
+
+apply from: 'tinkerpatch.gradle'
