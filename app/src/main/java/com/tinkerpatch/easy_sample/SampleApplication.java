@@ -61,15 +61,16 @@ public class SampleApplication extends Application {
         MultiDex.install(base);
     }
 
-
-    /**
-     * 由于在onCreate替换真正的Application,
-     * 我们建议在onCreate初始化TinkerPatch,而不是attachBaseContext
-     */
     @Override
     public void onCreate() {
         super.onCreate();
-        // 我们可以从这里获得Tinker加载过程的信息
+        initTinker();
+    }
+
+    /**
+     * 我们需要确保至少在主进程和patch进程中初始化 TinkerPatch
+     */
+    private void initTinker() {
         if (BuildConfig.TINKER_ENABLE) {
             tinkerApplicationLike = TinkerPatchApplicationLike.getTinkerPatchApplicationLike();
 
@@ -82,11 +83,11 @@ public class SampleApplication extends Application {
             // 获取当前的补丁版本
             Log.d(TAG, "current patch version is " + TinkerPatch.with().getPatchVersion());
 
-            // 每隔3个小时去访问后台时候有更新,通过handler实现轮训的效果
-            new FetchPatchHandler().fetchPatchWithInterval(3);
+            // 每隔3个小时去访问后台时候有更新, 通过 handler 实现轮询的效果
+            // 默认 setFetchPatchIntervalByHours 只是设置调用的频率限制，并没有去轮询
+            TinkerPatch.with().startPoll(3);
         }
     }
-
 
 
     /**
